@@ -1,0 +1,123 @@
+# Flask Project Makefile
+# Comprehensive makefile for Flask web development
+#
+# Copy this file to your Flask project root as 'Makefile'
+# Requires: Python 3.10+, Poetry
+
+include ../common/Makefile.common
+
+# ==================================================================================== #
+# FLASK-SPECIFIC VARIABLES
+# ==================================================================================== #
+
+FLASK_APP?=app.py
+FLASK_ENV?=development
+HOST?=127.0.0.1
+PORT?=5000
+
+# ==================================================================================== #
+# HELP
+# ==================================================================================== #
+
+.PHONY: help
+help:
+	@echo "$(COLOR_CYAN)$(COLOR_BOLD)"
+	@echo "╔════════════════════════════════════════════════════════════════╗"
+	@echo "║             Flask Project Makefile Commands                    ║"
+	@echo "╚════════════════════════════════════════════════════════════════╝"
+	@echo "$(COLOR_RESET)"
+	@echo "$(COLOR_GREEN)$(EMOJI_WEB) Flask Development:$(COLOR_RESET)"
+	@echo "  $(COLOR_YELLOW)run$(COLOR_RESET)               - Run Flask development server"
+	@echo "  $(COLOR_YELLOW)run-debug$(COLOR_RESET)         - Run with debugger enabled"
+	@echo "  $(COLOR_YELLOW)shell$(COLOR_RESET)             - Open Flask shell"
+	@echo "  $(COLOR_YELLOW)routes$(COLOR_RESET)            - Display all routes"
+	@echo ""
+	@echo "$(COLOR_GREEN)📊 Database (Flask-Migrate):$(COLOR_RESET)"
+	@echo "  $(COLOR_YELLOW)db-init$(COLOR_RESET)           - Initialize migrations"
+	@echo "  $(COLOR_YELLOW)db-migrate$(COLOR_RESET)        - Create new migration"
+	@echo "  $(COLOR_YELLOW)db-upgrade$(COLOR_RESET)        - Apply migrations"
+	@echo "  $(COLOR_YELLOW)db-downgrade$(COLOR_RESET)      - Rollback migration"
+	@echo ""
+	@echo "$(COLOR_GREEN)$(EMOJI_TEST) Testing:$(COLOR_RESET) test, test-cov, test-verbose"
+	@echo "$(COLOR_GREEN)$(EMOJI_LINT) Quality:$(COLOR_RESET) format, lint, typecheck"
+	@echo "$(COLOR_GREEN)$(EMOJI_ROCKET) Production:$(COLOR_RESET) gunicorn"
+	@echo ""
+
+.DEFAULT_GOAL := help
+
+# ==================================================================================== #
+# FLASK DEVELOPMENT
+# ==================================================================================== #
+
+## run: Run Flask development server
+.PHONY: run
+run:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)$(EMOJI_ROCKET) Starting Flask server...$(COLOR_RESET)"
+	@echo "$(COLOR_CYAN)Server at: http://$(HOST):$(PORT)$(COLOR_RESET)"
+	@FLASK_APP=$(FLASK_APP) FLASK_ENV=$(FLASK_ENV) $(POETRY_RUN) flask run --host $(HOST) --port $(PORT)
+
+## run-debug: Run with debugger
+.PHONY: run-debug
+run-debug:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)$(EMOJI_ROCKET) Starting Flask with debugger...$(COLOR_RESET)"
+	@FLASK_APP=$(FLASK_APP) FLASK_ENV=development FLASK_DEBUG=1 $(POETRY_RUN) flask run --host $(HOST) --port $(PORT)
+
+## shell: Open Flask shell
+.PHONY: shell
+shell:
+	$(call check_poetry)
+	@FLASK_APP=$(FLASK_APP) $(POETRY_RUN) flask shell
+
+## routes: Display all routes
+.PHONY: routes
+routes:
+	$(call check_poetry)
+	@FLASK_APP=$(FLASK_APP) $(POETRY_RUN) flask routes
+
+# ==================================================================================== #
+# DATABASE (Flask-Migrate)
+# ==================================================================================== #
+
+## db-init: Initialize migrations
+.PHONY: db-init
+db-init:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)📊 Initializing Flask-Migrate...$(COLOR_RESET)"
+	@FLASK_APP=$(FLASK_APP) $(POETRY_RUN) flask db init
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Migrations initialized!$(COLOR_RESET)"
+
+## db-migrate: Create new migration
+.PHONY: db-migrate
+db-migrate:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)📊 Creating migration...$(COLOR_RESET)"
+	@read -p "Migration message: " message; \
+	FLASK_APP=$(FLASK_APP) $(POETRY_RUN) flask db migrate -m "$$message"
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Migration created!$(COLOR_RESET)"
+
+## db-upgrade: Apply migrations
+.PHONY: db-upgrade
+db-upgrade:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)📊 Applying migrations...$(COLOR_RESET)"
+	@FLASK_APP=$(FLASK_APP) $(POETRY_RUN) flask db upgrade
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Database upgraded!$(COLOR_RESET)"
+
+## db-downgrade: Rollback migration
+.PHONY: db-downgrade
+db-downgrade:
+	$(call check_poetry)
+	@FLASK_APP=$(FLASK_APP) $(POETRY_RUN) flask db downgrade
+
+## gunicorn: Run with Gunicorn
+.PHONY: gunicorn
+gunicorn:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)$(EMOJI_ROCKET) Starting Gunicorn...$(COLOR_RESET)"
+	@$(POETRY_RUN) gunicorn "$(FLASK_APP):create_app()" --bind 0.0.0.0:$(PORT) --workers 4
+
+## quickstart: Install, migrate, and run
+.PHONY: quickstart
+quickstart: install-dev db-upgrade run

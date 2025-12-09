@@ -1,0 +1,266 @@
+# Django Project Makefile
+# Comprehensive makefile for Django web development
+#
+# Copy this file to your Django project root as 'Makefile'
+# Requires: Python 3.10+, Poetry
+
+# Include common Python targets and variables
+include ../common/Makefile.common
+
+# ==================================================================================== #
+# DJANGO-SPECIFIC VARIABLES
+# ==================================================================================== #
+
+# Django settings
+DJANGO_SETTINGS_MODULE?=config.settings
+MANAGE := $(POETRY_RUN) python manage.py
+HOST?=127.0.0.1
+PORT?=8000
+
+# ==================================================================================== #
+# HELP
+# ==================================================================================== #
+
+.PHONY: help
+help:
+	@echo "$(COLOR_CYAN)$(COLOR_BOLD)"
+	@echo "╔════════════════════════════════════════════════════════════════╗"
+	@echo "║            Django Project Makefile Commands                    ║"
+	@echo "╚════════════════════════════════════════════════════════════════╝"
+	@echo "$(COLOR_RESET)"
+	@echo "$(COLOR_GREEN)$(EMOJI_WEB) Django Development Commands:$(COLOR_RESET)"
+	@echo "  $(COLOR_YELLOW)runserver$(COLOR_RESET)         - Run Django development server"
+	@echo "  $(COLOR_YELLOW)runserver-plus$(COLOR_RESET)    - Run development server with Werkzeug debugger"
+	@echo "  $(COLOR_YELLOW)shell$(COLOR_RESET)             - Open Django shell"
+	@echo "  $(COLOR_YELLOW)shell-plus$(COLOR_RESET)        - Open Django shell with models auto-loaded"
+	@echo "  $(COLOR_YELLOW)dbshell$(COLOR_RESET)           - Open database shell"
+	@echo ""
+	@echo "$(COLOR_GREEN)📊 Database Commands:$(COLOR_RESET)"
+	@echo "  $(COLOR_YELLOW)makemigrations$(COLOR_RESET)    - Create new migrations"
+	@echo "  $(COLOR_YELLOW)migrate$(COLOR_RESET)           - Apply migrations"
+	@echo "  $(COLOR_YELLOW)showmigrations$(COLOR_RESET)    - Show all migrations"
+	@echo "  $(COLOR_YELLOW)db-reset$(COLOR_RESET)          - Reset database (drop + migrate)"
+	@echo "  $(COLOR_YELLOW)db-seed$(COLOR_RESET)           - Load fixtures/seed data"
+	@echo ""
+	@echo "$(COLOR_GREEN)$(EMOJI_PACKAGE) Static Files:$(COLOR_RESET)"
+	@echo "  $(COLOR_YELLOW)collectstatic$(COLOR_RESET)     - Collect static files"
+	@echo "  $(COLOR_YELLOW)compress$(COLOR_RESET)          - Compress static assets"
+	@echo ""
+	@echo "$(COLOR_GREEN)👤 User Management:$(COLOR_RESET)"
+	@echo "  $(COLOR_YELLOW)createsuperuser$(COLOR_RESET)   - Create Django superuser"
+	@echo "  $(COLOR_YELLOW)changepassword$(COLOR_RESET)    - Change user password"
+	@echo ""
+	@echo "$(COLOR_GREEN)$(EMOJI_TEST) Testing:$(COLOR_RESET)"
+	@echo "  $(COLOR_YELLOW)test$(COLOR_RESET)              - Run Django tests"
+	@echo "  $(COLOR_YELLOW)test-verbose$(COLOR_RESET)      - Run tests with verbose output"
+	@echo "  $(COLOR_YELLOW)test-cov$(COLOR_RESET)          - Run tests with coverage"
+	@echo ""
+	@echo "$(COLOR_GREEN)$(EMOJI_LINT) Code Quality:$(COLOR_RESET)"
+	@echo "  $(COLOR_YELLOW)format$(COLOR_RESET), $(COLOR_YELLOW)lint$(COLOR_RESET), $(COLOR_YELLOW)typecheck$(COLOR_RESET), $(COLOR_YELLOW)check-all$(COLOR_RESET)"
+	@echo ""
+	@echo "$(COLOR_GREEN)$(EMOJI_SECURITY) Security:$(COLOR_RESET)"
+	@echo "  $(COLOR_YELLOW)check$(COLOR_RESET)             - Run Django system checks"
+	@echo "  $(COLOR_YELLOW)security$(COLOR_RESET), $(COLOR_YELLOW)safety$(COLOR_RESET), $(COLOR_YELLOW)security-all$(COLOR_RESET)"
+	@echo ""
+	@echo "$(COLOR_GREEN)$(EMOJI_ROCKET) Production:$(COLOR_RESET)"
+	@echo "  $(COLOR_YELLOW)gunicorn$(COLOR_RESET)          - Run with Gunicorn"
+	@echo "  $(COLOR_YELLOW)deploy-check$(COLOR_RESET)      - Run all deployment checks"
+	@echo ""
+	@echo "$(COLOR_GREEN)$(EMOJI_CLEAN) Cleanup:$(COLOR_RESET)"
+	@echo "  $(COLOR_YELLOW)clean$(COLOR_RESET), $(COLOR_YELLOW)clean-all$(COLOR_RESET)"
+	@echo ""
+	@echo "$(COLOR_CYAN)Python:$(COLOR_RESET) $(PYTHON_VERSION) | $(COLOR_CYAN)Version:$(COLOR_RESET) $(VERSION)"
+	@echo ""
+
+.DEFAULT_GOAL := help
+
+# ==================================================================================== #
+# DJANGO DEVELOPMENT
+# ==================================================================================== #
+
+## runserver: Run Django development server
+.PHONY: runserver
+runserver:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)$(EMOJI_ROCKET) Starting Django development server...$(COLOR_RESET)"
+	@echo "$(COLOR_CYAN)Server at: http://$(HOST):$(PORT)$(COLOR_RESET)"
+	@$(MANAGE) runserver $(HOST):$(PORT)
+
+## runserver-plus: Run development server with Werkzeug debugger
+.PHONY: runserver-plus
+runserver-plus:
+	$(call check_poetry)
+	@if ! $(POETRY_RUN) which python | xargs -I {} {} -c "import django_extensions" 2>/dev/null; then \
+		echo "$(COLOR_YELLOW)$(EMOJI_WARNING) django-extensions not installed$(COLOR_RESET)"; \
+		echo "$(COLOR_YELLOW)Install: poetry add --group dev django-extensions werkzeug$(COLOR_RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(COLOR_BLUE)$(EMOJI_ROCKET) Starting Django server with debugger...$(COLOR_RESET)"
+	@$(MANAGE) runserver_plus $(HOST):$(PORT)
+
+## shell: Open Django shell
+.PHONY: shell
+shell:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)$(EMOJI_PYTHON) Opening Django shell...$(COLOR_RESET)"
+	@$(MANAGE) shell
+
+## shell-plus: Open Django shell with models auto-loaded
+.PHONY: shell-plus
+shell-plus:
+	$(call check_poetry)
+	@if ! $(POETRY_RUN) which python | xargs -I {} {} -c "import django_extensions" 2>/dev/null; then \
+		echo "$(COLOR_YELLOW)Using standard shell (install django-extensions for shell_plus)$(COLOR_RESET)"; \
+		$(MANAGE) shell; \
+	else \
+		@$(MANAGE) shell_plus; \
+	fi
+
+## dbshell: Open database shell
+.PHONY: dbshell
+dbshell:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)📊 Opening database shell...$(COLOR_RESET)"
+	@$(MANAGE) dbshell
+
+# ==================================================================================== #
+# DATABASE COMMANDS
+# ==================================================================================== #
+
+## makemigrations: Create new migrations
+.PHONY: makemigrations
+makemigrations:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)📊 Creating migrations...$(COLOR_RESET)"
+	@$(MANAGE) makemigrations
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Migrations created!$(COLOR_RESET)"
+
+## migrate: Apply migrations
+.PHONY: migrate
+migrate:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)📊 Applying migrations...$(COLOR_RESET)"
+	@$(MANAGE) migrate
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Migrations applied!$(COLOR_RESET)"
+
+## showmigrations: Show all migrations
+.PHONY: showmigrations
+showmigrations:
+	$(call check_poetry)
+	@$(MANAGE) showmigrations
+
+## db-reset: Reset database (WARNING: destroys all data)
+.PHONY: db-reset
+db-reset:
+	$(call check_poetry)
+	@echo "$(COLOR_RED)$(EMOJI_WARNING) This will destroy all database data!$(COLOR_RESET)"
+	@read -p "Are you sure? [y/N] " -n 1 -r; \
+	echo; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		echo "$(COLOR_BLUE)📊 Resetting database...$(COLOR_RESET)"; \
+		$(MANAGE) flush --no-input; \
+		$(MANAGE) migrate; \
+		echo "$(COLOR_GREEN)$(EMOJI_CHECK) Database reset!$(COLOR_RESET)"; \
+	fi
+
+## db-seed: Load fixtures/seed data
+.PHONY: db-seed
+db-seed:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)📊 Loading fixtures...$(COLOR_RESET)"
+	@if [ -d "fixtures" ]; then \
+		for fixture in fixtures/*.json; do \
+			echo "Loading $$fixture..."; \
+			$(MANAGE) loaddata $$fixture; \
+		done; \
+		echo "$(COLOR_GREEN)$(EMOJI_CHECK) Fixtures loaded!$(COLOR_RESET)"; \
+	else \
+		echo "$(COLOR_YELLOW)$(EMOJI_WARNING) No fixtures directory found$(COLOR_RESET)"; \
+	fi
+
+# ==================================================================================== #
+# STATIC FILES
+# ==================================================================================== #
+
+## collectstatic: Collect static files
+.PHONY: collectstatic
+collectstatic:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)$(EMOJI_PACKAGE) Collecting static files...$(COLOR_RESET)"
+	@$(MANAGE) collectstatic --no-input
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Static files collected!$(COLOR_RESET)"
+
+## compress: Compress static assets
+.PHONY: compress
+compress:
+	$(call check_poetry)
+	@if $(MANAGE) help compress > /dev/null 2>&1; then \
+		echo "$(COLOR_BLUE)$(EMOJI_PACKAGE) Compressing static assets...$(COLOR_RESET)"; \
+		$(MANAGE) compress; \
+		echo "$(COLOR_GREEN)$(EMOJI_CHECK) Static assets compressed!$(COLOR_RESET)"; \
+	else \
+		echo "$(COLOR_YELLOW)$(EMOJI_WARNING) django-compressor not installed$(COLOR_RESET)"; \
+	fi
+
+# ==================================================================================== #
+# USER MANAGEMENT
+# ==================================================================================== #
+
+## createsuperuser: Create Django superuser
+.PHONY: createsuperuser
+createsuperuser:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)👤 Creating superuser...$(COLOR_RESET)"
+	@$(MANAGE) createsuperuser
+
+## changepassword: Change user password
+.PHONY: changepassword
+changepassword:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)👤 Changing password...$(COLOR_RESET)"
+	@$(MANAGE) changepassword
+
+# ==================================================================================== #
+# DJANGO CHECKS
+# ==================================================================================== #
+
+## check: Run Django system checks
+.PHONY: check
+check:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)$(EMOJI_LINT) Running Django checks...$(COLOR_RESET)"
+	@$(MANAGE) check
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Django checks passed!$(COLOR_RESET)"
+
+## check-deploy: Run deployment checks
+.PHONY: check-deploy
+check-deploy:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)$(EMOJI_SECURITY) Running deployment checks...$(COLOR_RESET)"
+	@$(MANAGE) check --deploy
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Deployment checks passed!$(COLOR_RESET)"
+
+# ==================================================================================== #
+# PRODUCTION
+# ==================================================================================== #
+
+## gunicorn: Run with Gunicorn
+.PHONY: gunicorn
+gunicorn:
+	$(call check_poetry)
+	@if ! $(POETRY_RUN) which gunicorn > /dev/null 2>&1; then \
+		echo "$(COLOR_YELLOW)$(EMOJI_WARNING) gunicorn not installed$(COLOR_RESET)"; \
+		echo "$(COLOR_YELLOW)Install: poetry add gunicorn$(COLOR_RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(COLOR_BLUE)$(EMOJI_ROCKET) Starting Gunicorn...$(COLOR_RESET)"
+	@$(POETRY_RUN) gunicorn config.wsgi:application --bind 0.0.0.0:$(PORT) --workers 4
+
+## deploy-check: Run all deployment checks
+.PHONY: deploy-check
+deploy-check: ci check-deploy collectstatic
+	@echo "$(COLOR_GREEN)$(COLOR_BOLD)$(EMOJI_CHECK) Ready for deployment!$(COLOR_RESET)"
+
+## quickstart: Install, migrate, and run server
+.PHONY: quickstart
+quickstart: install-dev migrate runserver

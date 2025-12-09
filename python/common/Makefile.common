@@ -1,0 +1,446 @@
+# Python Common Makefile
+# Shared variables and targets for all Python projects
+# This file is meant to be included by other Makefiles
+
+# ==================================================================================== #
+# VARIABLES
+# ==================================================================================== #
+
+# Project detection
+PROJECT_NAME?=$(shell basename $(CURDIR))
+PROJECT_DIR=$(shell pwd)
+
+# Python and Poetry detection
+PYTHON?=python3
+POETRY := $(shell command -v poetry 2> /dev/null)
+POETRY_RUN := poetry run
+
+# Python version detection
+PYTHON_VERSION := $(shell $(POETRY_RUN) python --version 2>&1 | cut -d' ' -f2 || echo "not-found")
+POETRY_VERSION := $(shell poetry --version 2>&1 | cut -d' ' -f3 || echo "not-installed")
+
+# Virtual environment detection
+VENV_PATH := $(shell poetry env info --path 2>/dev/null || echo "not-initialized")
+
+# Version information
+VERSION?=0.1.0
+BUILD_TIME=$(shell date -u '+%Y-%m-%d_%H:%M:%S')
+GIT_COMMIT=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+GIT_BRANCH=$(shell git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+
+# ANSI Color codes for pretty output
+COLOR_RESET=\033[0m
+COLOR_BOLD=\033[1m
+COLOR_RED=\033[31m
+COLOR_GREEN=\033[32m
+COLOR_YELLOW=\033[33m
+COLOR_BLUE=\033[34m
+COLOR_MAGENTA=\033[35m
+COLOR_CYAN=\033[36m
+COLOR_WHITE=\033[37m
+
+# Emojis for better visual feedback
+EMOJI_CHECK=✅
+EMOJI_BUILD=🔨
+EMOJI_TEST=🧪
+EMOJI_CLEAN=🧹
+EMOJI_ROCKET=🚀
+EMOJI_PACKAGE=📦
+EMOJI_DOCS=📚
+EMOJI_SECURITY=🔒
+EMOJI_LINT=🔍
+EMOJI_PYTHON=🐍
+EMOJI_WEB=🌐
+EMOJI_DATA=📊
+EMOJI_API=🔌
+EMOJI_WARNING=⚠️
+EMOJI_ERROR=❌
+EMOJI_INFO=ℹ️
+
+# Tool detection
+HAS_RUFF := $(shell $(POETRY_RUN) which ruff 2> /dev/null)
+HAS_MYPY := $(shell $(POETRY_RUN) which mypy 2> /dev/null)
+HAS_PYTEST := $(shell $(POETRY_RUN) which pytest 2> /dev/null)
+HAS_BANDIT := $(shell $(POETRY_RUN) which bandit 2> /dev/null)
+HAS_SPHINX := $(shell $(POETRY_RUN) which sphinx-build 2> /dev/null)
+HAS_DOCKER := $(shell command -v docker 2> /dev/null)
+
+# ==================================================================================== #
+# HELPER FUNCTIONS
+# ==================================================================================== #
+
+# Check if Poetry is installed
+define check_poetry
+	@if [ -z "$(POETRY)" ]; then \
+		echo "$(COLOR_RED)$(EMOJI_ERROR) Poetry not found$(COLOR_RESET)"; \
+		echo "$(COLOR_YELLOW)Install: curl -sSL https://install.python-poetry.org | python3 -$(COLOR_RESET)"; \
+		echo "$(COLOR_YELLOW)Or visit: https://python-poetry.org/docs/#installation$(COLOR_RESET)"; \
+		exit 1; \
+	fi
+endef
+
+# Check if a Python tool is installed via Poetry
+define check_tool
+	@if ! $(POETRY_RUN) which $(1) > /dev/null 2>&1; then \
+		echo "$(COLOR_RED)$(EMOJI_ERROR) $(1) not installed$(COLOR_RESET)"; \
+		echo "$(COLOR_YELLOW)Install: poetry add --group dev $(1)$(COLOR_RESET)"; \
+		exit 1; \
+	fi
+endef
+
+# ==================================================================================== #
+# ENVIRONMENT SETUP
+# ==================================================================================== #
+
+## install: Install production dependencies
+.PHONY: install
+install:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)$(EMOJI_PACKAGE) Installing dependencies...$(COLOR_RESET)"
+	@poetry install --only main
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Dependencies installed!$(COLOR_RESET)"
+
+## install-dev: Install all dependencies including development
+.PHONY: install-dev
+install-dev:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)$(EMOJI_PACKAGE) Installing development dependencies...$(COLOR_RESET)"
+	@poetry install
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Development dependencies installed!$(COLOR_RESET)"
+
+## update: Update dependencies
+.PHONY: update
+update:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)$(EMOJI_PACKAGE) Updating dependencies...$(COLOR_RESET)"
+	@poetry update
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Dependencies updated!$(COLOR_RESET)"
+
+## lock: Update poetry.lock without upgrading dependencies
+.PHONY: lock
+lock:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)$(EMOJI_PACKAGE) Updating lock file...$(COLOR_RESET)"
+	@poetry lock --no-update
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Lock file updated!$(COLOR_RESET)"
+
+## show: Show installed dependencies
+.PHONY: show
+show:
+	$(call check_poetry)
+	@poetry show --tree
+
+## env-info: Display Python and Poetry environment information
+.PHONY: env-info
+env-info:
+	@echo "$(COLOR_CYAN)$(COLOR_BOLD)Environment Information:$(COLOR_RESET)"
+	@echo "  $(COLOR_YELLOW)Project:$(COLOR_RESET) $(PROJECT_NAME)"
+	@echo "  $(COLOR_YELLOW)Python Version:$(COLOR_RESET) $(PYTHON_VERSION)"
+	@echo "  $(COLOR_YELLOW)Poetry Version:$(COLOR_RESET) $(POETRY_VERSION)"
+	@echo "  $(COLOR_YELLOW)Virtual Env:$(COLOR_RESET) $(VENV_PATH)"
+	@echo "  $(COLOR_YELLOW)Version:$(COLOR_RESET) $(VERSION)"
+	@echo "  $(COLOR_YELLOW)Git Commit:$(COLOR_RESET) $(GIT_COMMIT)"
+	@echo "  $(COLOR_YELLOW)Git Branch:$(COLOR_RESET) $(GIT_BRANCH)"
+
+# ==================================================================================== #
+# TESTING
+# ==================================================================================== #
+
+## test: Run all tests
+.PHONY: test
+test:
+	$(call check_poetry)
+	$(call check_tool,pytest)
+	@echo "$(COLOR_BLUE)$(EMOJI_TEST) Running tests...$(COLOR_RESET)"
+	@$(POETRY_RUN) pytest
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Tests passed!$(COLOR_RESET)"
+
+## test-verbose: Run tests with verbose output
+.PHONY: test-verbose
+test-verbose:
+	$(call check_poetry)
+	$(call check_tool,pytest)
+	@echo "$(COLOR_BLUE)$(EMOJI_TEST) Running tests (verbose)...$(COLOR_RESET)"
+	@$(POETRY_RUN) pytest -v
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Tests passed!$(COLOR_RESET)"
+
+## test-watch: Run tests in watch mode
+.PHONY: test-watch
+test-watch:
+	$(call check_poetry)
+	$(call check_tool,pytest)
+	@echo "$(COLOR_BLUE)$(EMOJI_TEST) Starting test watcher...$(COLOR_RESET)"
+	@if $(POETRY_RUN) which ptw > /dev/null 2>&1; then \
+		$(POETRY_RUN) ptw; \
+	else \
+		echo "$(COLOR_YELLOW)$(EMOJI_WARNING) pytest-watch not installed$(COLOR_RESET)"; \
+		echo "$(COLOR_YELLOW)Install: poetry add --group dev pytest-watch$(COLOR_RESET)"; \
+		exit 1; \
+	fi
+
+## test-failed: Rerun only failed tests
+.PHONY: test-failed
+test-failed:
+	$(call check_poetry)
+	$(call check_tool,pytest)
+	@echo "$(COLOR_BLUE)$(EMOJI_TEST) Rerunning failed tests...$(COLOR_RESET)"
+	@$(POETRY_RUN) pytest --lf
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Failed tests rerun complete!$(COLOR_RESET)"
+
+## test-cov: Run tests with coverage report
+.PHONY: test-cov
+test-cov:
+	$(call check_poetry)
+	$(call check_tool,pytest)
+	@echo "$(COLOR_BLUE)$(EMOJI_TEST) Running tests with coverage...$(COLOR_RESET)"
+	@$(POETRY_RUN) pytest --cov --cov-report=term-missing
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Coverage report generated!$(COLOR_RESET)"
+
+## test-cov-html: Generate HTML coverage report
+.PHONY: test-cov-html
+test-cov-html:
+	$(call check_poetry)
+	$(call check_tool,pytest)
+	@echo "$(COLOR_BLUE)$(EMOJI_TEST) Generating HTML coverage report...$(COLOR_RESET)"
+	@$(POETRY_RUN) pytest --cov --cov-report=html
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) HTML coverage report: htmlcov/index.html$(COLOR_RESET)"
+
+# ==================================================================================== #
+# CODE QUALITY
+# ==================================================================================== #
+
+## format: Format code with ruff
+.PHONY: format
+format:
+	$(call check_poetry)
+	$(call check_tool,ruff)
+	@echo "$(COLOR_BLUE)$(EMOJI_LINT) Formatting code...$(COLOR_RESET)"
+	@$(POETRY_RUN) ruff format .
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Code formatted!$(COLOR_RESET)"
+
+## format-check: Check code formatting
+.PHONY: format-check
+format-check:
+	$(call check_poetry)
+	$(call check_tool,ruff)
+	@echo "$(COLOR_BLUE)$(EMOJI_LINT) Checking code formatting...$(COLOR_RESET)"
+	@if ! $(POETRY_RUN) ruff format --check . > /dev/null 2>&1; then \
+		echo "$(COLOR_RED)$(EMOJI_ERROR) Code is not formatted$(COLOR_RESET)"; \
+		echo "$(COLOR_YELLOW)Run: make format$(COLOR_RESET)"; \
+		$(POETRY_RUN) ruff format --check .; \
+		exit 1; \
+	else \
+		echo "$(COLOR_GREEN)$(EMOJI_CHECK) Code is properly formatted!$(COLOR_RESET)"; \
+	fi
+
+## lint: Run linter (ruff)
+.PHONY: lint
+lint:
+	$(call check_poetry)
+	$(call check_tool,ruff)
+	@echo "$(COLOR_BLUE)$(EMOJI_LINT) Running linter...$(COLOR_RESET)"
+	@$(POETRY_RUN) ruff check .
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Linting complete!$(COLOR_RESET)"
+
+## lint-fix: Run linter with auto-fix
+.PHONY: lint-fix
+lint-fix:
+	$(call check_poetry)
+	$(call check_tool,ruff)
+	@echo "$(COLOR_BLUE)$(EMOJI_LINT) Running linter with auto-fix...$(COLOR_RESET)"
+	@$(POETRY_RUN) ruff check --fix .
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Linting with fixes complete!$(COLOR_RESET)"
+
+## typecheck: Run type checker (mypy)
+.PHONY: typecheck
+typecheck:
+	$(call check_poetry)
+	$(call check_tool,mypy)
+	@echo "$(COLOR_BLUE)$(EMOJI_LINT) Running type checker...$(COLOR_RESET)"
+	@$(POETRY_RUN) mypy .
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Type checking complete!$(COLOR_RESET)"
+
+## check-all: Run all code quality checks
+.PHONY: check-all
+check-all: format-check lint typecheck
+	@echo "$(COLOR_GREEN)$(COLOR_BOLD)$(EMOJI_CHECK) All quality checks passed!$(COLOR_RESET)"
+
+# ==================================================================================== #
+# SECURITY
+# ==================================================================================== #
+
+## security: Run security checks with bandit
+.PHONY: security
+security:
+	$(call check_poetry)
+	$(call check_tool,bandit)
+	@echo "$(COLOR_BLUE)$(EMOJI_SECURITY) Running security checks...$(COLOR_RESET)"
+	@$(POETRY_RUN) bandit -r . -x ./tests,./venv,./.venv
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Security scan complete!$(COLOR_RESET)"
+
+## safety: Check dependencies for known vulnerabilities
+.PHONY: safety
+safety:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)$(EMOJI_SECURITY) Checking dependencies for vulnerabilities...$(COLOR_RESET)"
+	@if $(POETRY_RUN) which safety > /dev/null 2>&1; then \
+		poetry export -f requirements.txt --without-hashes | $(POETRY_RUN) safety check --stdin; \
+		echo "$(COLOR_GREEN)$(EMOJI_CHECK) Dependency check complete!$(COLOR_RESET)"; \
+	else \
+		echo "$(COLOR_YELLOW)$(EMOJI_WARNING) safety not installed$(COLOR_RESET)"; \
+		echo "$(COLOR_YELLOW)Install: poetry add --group dev safety$(COLOR_RESET)"; \
+	fi
+
+## security-all: Run all security checks
+.PHONY: security-all
+security-all: security safety
+	@echo "$(COLOR_GREEN)$(COLOR_BOLD)$(EMOJI_CHECK) All security checks passed!$(COLOR_RESET)"
+
+# ==================================================================================== #
+# DOCUMENTATION
+# ==================================================================================== #
+
+## docs-build: Build documentation
+.PHONY: docs-build
+docs-build:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)$(EMOJI_DOCS) Building documentation...$(COLOR_RESET)"
+	@if $(POETRY_RUN) which sphinx-build > /dev/null 2>&1; then \
+		$(POETRY_RUN) sphinx-build -b html docs/ docs/_build/html; \
+		echo "$(COLOR_GREEN)$(EMOJI_CHECK) Documentation built: docs/_build/html/index.html$(COLOR_RESET)"; \
+	elif $(POETRY_RUN) which mkdocs > /dev/null 2>&1; then \
+		$(POETRY_RUN) mkdocs build; \
+		echo "$(COLOR_GREEN)$(EMOJI_CHECK) Documentation built: site/index.html$(COLOR_RESET)"; \
+	else \
+		echo "$(COLOR_YELLOW)$(EMOJI_WARNING) No documentation tool found$(COLOR_RESET)"; \
+		echo "$(COLOR_YELLOW)Install Sphinx: poetry add --group dev sphinx$(COLOR_RESET)"; \
+		echo "$(COLOR_YELLOW)Or MkDocs: poetry add --group dev mkdocs$(COLOR_RESET)"; \
+	fi
+
+## docs-serve: Serve documentation locally
+.PHONY: docs-serve
+docs-serve:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)$(EMOJI_DOCS) Starting documentation server...$(COLOR_RESET)"
+	@if $(POETRY_RUN) which sphinx-autobuild > /dev/null 2>&1; then \
+		echo "$(COLOR_CYAN)Documentation available at: http://localhost:8000$(COLOR_RESET)"; \
+		$(POETRY_RUN) sphinx-autobuild docs/ docs/_build/html; \
+	elif $(POETRY_RUN) which mkdocs > /dev/null 2>&1; then \
+		$(POETRY_RUN) mkdocs serve; \
+	else \
+		echo "$(COLOR_YELLOW)$(EMOJI_WARNING) No documentation server found$(COLOR_RESET)"; \
+		echo "$(COLOR_YELLOW)Install: poetry add --group dev sphinx-autobuild$(COLOR_RESET)"; \
+		echo "$(COLOR_YELLOW)Or: poetry add --group dev mkdocs$(COLOR_RESET)"; \
+	fi
+
+# ==================================================================================== #
+# CLEANUP
+# ==================================================================================== #
+
+## clean: Remove Python artifacts
+.PHONY: clean
+clean:
+	@echo "$(COLOR_BLUE)$(EMOJI_CLEAN) Cleaning Python artifacts...$(COLOR_RESET)"
+	@find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	@find . -type f -name "*.pyc" -delete 2>/dev/null || true
+	@find . -type f -name "*.pyo" -delete 2>/dev/null || true
+	@find . -type f -name "*.pyd" -delete 2>/dev/null || true
+	@find . -type f -name ".coverage" -delete 2>/dev/null || true
+	@find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+	@find . -type d -name "*.egg" -exec rm -rf {} + 2>/dev/null || true
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Python artifacts cleaned!$(COLOR_RESET)"
+
+## clean-test: Remove test artifacts
+.PHONY: clean-test
+clean-test:
+	@echo "$(COLOR_BLUE)$(EMOJI_CLEAN) Cleaning test artifacts...$(COLOR_RESET)"
+	@rm -rf .pytest_cache/ 2>/dev/null || true
+	@rm -rf .tox/ 2>/dev/null || true
+	@rm -rf htmlcov/ 2>/dev/null || true
+	@rm -f .coverage 2>/dev/null || true
+	@rm -f coverage.xml 2>/dev/null || true
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Test artifacts cleaned!$(COLOR_RESET)"
+
+## clean-build: Remove build artifacts
+.PHONY: clean-build
+clean-build:
+	@echo "$(COLOR_BLUE)$(EMOJI_CLEAN) Cleaning build artifacts...$(COLOR_RESET)"
+	@rm -rf build/ 2>/dev/null || true
+	@rm -rf dist/ 2>/dev/null || true
+	@rm -rf .eggs/ 2>/dev/null || true
+	@find . -type d -name "*.egg-info" -exec rm -rf {} + 2>/dev/null || true
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Build artifacts cleaned!$(COLOR_RESET)"
+
+## clean-docs: Remove documentation build artifacts
+.PHONY: clean-docs
+clean-docs:
+	@echo "$(COLOR_BLUE)$(EMOJI_CLEAN) Cleaning documentation artifacts...$(COLOR_RESET)"
+	@rm -rf docs/_build/ 2>/dev/null || true
+	@rm -rf site/ 2>/dev/null || true
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Documentation artifacts cleaned!$(COLOR_RESET)"
+
+## clean-all: Remove all generated files
+.PHONY: clean-all
+clean-all: clean clean-test clean-build clean-docs
+	@echo "$(COLOR_GREEN)$(COLOR_BOLD)$(EMOJI_CHECK) Deep cleanup complete!$(COLOR_RESET)"
+
+# ==================================================================================== #
+# DOCKER (Optional)
+# ==================================================================================== #
+
+## docker-build: Build Docker image
+.PHONY: docker-build
+docker-build:
+	@if [ -z "$(HAS_DOCKER)" ]; then \
+		echo "$(COLOR_RED)$(EMOJI_ERROR) Docker not found$(COLOR_RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(COLOR_BLUE)🐳 Building Docker image...$(COLOR_RESET)"
+	@docker build -t $(PROJECT_NAME):$(VERSION) -t $(PROJECT_NAME):latest .
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Docker image built: $(PROJECT_NAME):$(VERSION)$(COLOR_RESET)"
+
+## docker-run: Run Docker container
+.PHONY: docker-run
+docker-run:
+	@if [ -z "$(HAS_DOCKER)" ]; then \
+		echo "$(COLOR_RED)$(EMOJI_ERROR) Docker not found$(COLOR_RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(COLOR_BLUE)🐳 Running Docker container...$(COLOR_RESET)"
+	@docker run --rm -it $(PROJECT_NAME):latest
+
+## docker-test: Run tests in Docker container
+.PHONY: docker-test
+docker-test:
+	@if [ -z "$(HAS_DOCKER)" ]; then \
+		echo "$(COLOR_RED)$(EMOJI_ERROR) Docker not found$(COLOR_RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(COLOR_BLUE)🐳 Running tests in Docker...$(COLOR_RESET)"
+	@docker run --rm $(PROJECT_NAME):latest make test
+
+## docker-push: Push Docker image to registry
+.PHONY: docker-push
+docker-push:
+	@if [ -z "$(HAS_DOCKER)" ]; then \
+		echo "$(COLOR_RED)$(EMOJI_ERROR) Docker not found$(COLOR_RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(COLOR_BLUE)🐳 Pushing Docker image...$(COLOR_RESET)"
+	@docker push $(PROJECT_NAME):$(VERSION)
+	@docker push $(PROJECT_NAME):latest
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Docker image pushed!$(COLOR_RESET)"
+
+# ==================================================================================== #
+# COMBINED WORKFLOWS
+# ==================================================================================== #
+
+## pre-commit: Run checks before committing
+.PHONY: pre-commit
+pre-commit: format lint-fix test
+	@echo "$(COLOR_GREEN)$(COLOR_BOLD)$(EMOJI_CHECK) Ready to commit!$(COLOR_RESET)"
+
+## ci: Run full CI pipeline
+.PHONY: ci
+ci: format-check lint typecheck test-cov security-all
+	@echo "$(COLOR_GREEN)$(COLOR_BOLD)$(EMOJI_CHECK) CI pipeline passed!$(COLOR_RESET)"
