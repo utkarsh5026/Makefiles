@@ -1,0 +1,314 @@
+# FastAPI Project Makefile
+# Comprehensive makefile for FastAPI web development
+#
+# Copy this file to your FastAPI project root as 'Makefile'
+# Requires: Python 3.10+, Poetry
+
+# Include common Python targets and variables
+include ../common/Makefile.common
+
+# ==================================================================================== #
+# FASTAPI-SPECIFIC VARIABLES
+# ==================================================================================== #
+
+# FastAPI application settings
+APP_MODULE?=app.main:app
+HOST?=127.0.0.1
+PORT?=8000
+RELOAD?=true
+WORKERS?=4
+
+# Database settings (for Alembic)
+DATABASE_URL?=sqlite:///./app.db
+
+# ==================================================================================== #
+# HELP
+# ==================================================================================== #
+
+.PHONY: help
+help:
+	@echo "$(COLOR_CYAN)$(COLOR_BOLD)"
+	@echo "╔════════════════════════════════════════════════════════════════╗"
+	@echo "║           FastAPI Project Makefile Commands                    ║"
+	@echo "╚════════════════════════════════════════════════════════════════╝"
+	@echo "$(COLOR_RESET)"
+	@echo "$(COLOR_GREEN)$(EMOJI_WEB) FastAPI Development Commands:$(COLOR_RESET)"
+	@echo "  $(COLOR_YELLOW)dev-server$(COLOR_RESET)        - Run development server with hot-reload"
+	@echo "  $(COLOR_YELLOW)dev-debug$(COLOR_RESET)         - Run development server with debugger"
+	@echo "  $(COLOR_YELLOW)dev-ssl$(COLOR_RESET)           - Run development server with SSL"
+	@echo "  $(COLOR_YELLOW)shell$(COLOR_RESET)             - Open interactive Python shell"
+	@echo "  $(COLOR_YELLOW)routes$(COLOR_RESET)            - Display all API routes"
+	@echo ""
+	@echo "$(COLOR_GREEN)$(EMOJI_API) API Commands:$(COLOR_RESET)"
+	@echo "  $(COLOR_YELLOW)openapi-schema$(COLOR_RESET)    - Generate OpenAPI schema JSON"
+	@echo "  $(COLOR_YELLOW)openapi-validate$(COLOR_RESET)  - Validate OpenAPI schema"
+	@echo "  $(COLOR_YELLOW)api-test$(COLOR_RESET)          - Test API endpoints with httpx"
+	@echo ""
+	@echo "$(COLOR_GREEN)📊 Database Commands (Alembic):$(COLOR_RESET)"
+	@echo "  $(COLOR_YELLOW)db-init$(COLOR_RESET)           - Initialize Alembic migrations"
+	@echo "  $(COLOR_YELLOW)db-migrate$(COLOR_RESET)        - Create new migration"
+	@echo "  $(COLOR_YELLOW)db-upgrade$(COLOR_RESET)        - Apply migrations (upgrade to head)"
+	@echo "  $(COLOR_YELLOW)db-downgrade$(COLOR_RESET)      - Rollback last migration"
+	@echo "  $(COLOR_YELLOW)db-history$(COLOR_RESET)        - Show migration history"
+	@echo "  $(COLOR_YELLOW)db-current$(COLOR_RESET)        - Show current migration version"
+	@echo "  $(COLOR_YELLOW)db-reset$(COLOR_RESET)          - Reset database (drop + recreate)"
+	@echo ""
+	@echo "$(COLOR_GREEN)$(EMOJI_ROCKET) Production Commands:$(COLOR_RESET)"
+	@echo "  $(COLOR_YELLOW)serve$(COLOR_RESET)             - Run with Uvicorn (production)"
+	@echo "  $(COLOR_YELLOW)serve-gunicorn$(COLOR_RESET)    - Run with Gunicorn + Uvicorn workers"
+	@echo ""
+	@echo "$(COLOR_GREEN)$(EMOJI_PACKAGE) Dependency Commands:$(COLOR_RESET)"
+	@echo "  $(COLOR_YELLOW)install$(COLOR_RESET)           - Install production dependencies"
+	@echo "  $(COLOR_YELLOW)install-dev$(COLOR_RESET)       - Install all dependencies"
+	@echo "  $(COLOR_YELLOW)update$(COLOR_RESET)            - Update dependencies"
+	@echo "  $(COLOR_YELLOW)show$(COLOR_RESET)              - Show installed dependencies"
+	@echo ""
+	@echo "$(COLOR_GREEN)$(EMOJI_TEST) Testing Commands:$(COLOR_RESET)"
+	@echo "  $(COLOR_YELLOW)test$(COLOR_RESET)              - Run all tests"
+	@echo "  $(COLOR_YELLOW)test-verbose$(COLOR_RESET)      - Run tests with verbose output"
+	@echo "  $(COLOR_YELLOW)test-watch$(COLOR_RESET)        - Run tests in watch mode"
+	@echo "  $(COLOR_YELLOW)test-cov$(COLOR_RESET)          - Run tests with coverage"
+	@echo "  $(COLOR_YELLOW)test-cov-html$(COLOR_RESET)     - Generate HTML coverage report"
+	@echo ""
+	@echo "$(COLOR_GREEN)$(EMOJI_LINT) Code Quality Commands:$(COLOR_RESET)"
+	@echo "  $(COLOR_YELLOW)format$(COLOR_RESET)            - Format code with ruff"
+	@echo "  $(COLOR_YELLOW)format-check$(COLOR_RESET)      - Check code formatting"
+	@echo "  $(COLOR_YELLOW)lint$(COLOR_RESET)              - Run linter"
+	@echo "  $(COLOR_YELLOW)lint-fix$(COLOR_RESET)          - Run linter with auto-fix"
+	@echo "  $(COLOR_YELLOW)typecheck$(COLOR_RESET)         - Run type checker (mypy)"
+	@echo "  $(COLOR_YELLOW)check-all$(COLOR_RESET)         - Run all quality checks"
+	@echo ""
+	@echo "$(COLOR_GREEN)$(EMOJI_SECURITY) Security Commands:$(COLOR_RESET)"
+	@echo "  $(COLOR_YELLOW)security$(COLOR_RESET)          - Run security checks"
+	@echo "  $(COLOR_YELLOW)safety$(COLOR_RESET)            - Check dependencies for vulnerabilities"
+	@echo "  $(COLOR_YELLOW)security-all$(COLOR_RESET)      - Run all security checks"
+	@echo ""
+	@echo "$(COLOR_GREEN)🐳 Docker Commands:$(COLOR_RESET)"
+	@echo "  $(COLOR_YELLOW)docker-build$(COLOR_RESET)      - Build Docker image"
+	@echo "  $(COLOR_YELLOW)docker-run$(COLOR_RESET)        - Run Docker container"
+	@echo "  $(COLOR_YELLOW)docker-test$(COLOR_RESET)       - Run tests in Docker"
+	@echo "  $(COLOR_YELLOW)docker-push$(COLOR_RESET)       - Push Docker image"
+	@echo ""
+	@echo "$(COLOR_GREEN)$(EMOJI_CLEAN) Cleanup Commands:$(COLOR_RESET)"
+	@echo "  $(COLOR_YELLOW)clean$(COLOR_RESET)             - Remove Python artifacts"
+	@echo "  $(COLOR_YELLOW)clean-test$(COLOR_RESET)        - Remove test artifacts"
+	@echo "  $(COLOR_YELLOW)clean-all$(COLOR_RESET)         - Remove all generated files"
+	@echo ""
+	@echo "$(COLOR_GREEN)🛠️  Combined Commands:$(COLOR_RESET)"
+	@echo "  $(COLOR_YELLOW)pre-commit$(COLOR_RESET)        - Run checks before committing"
+	@echo "  $(COLOR_YELLOW)ci$(COLOR_RESET)                - Run full CI pipeline"
+	@echo "  $(COLOR_YELLOW)env-info$(COLOR_RESET)          - Display environment information"
+	@echo ""
+	@echo "$(COLOR_CYAN)$(COLOR_BOLD)Version:$(COLOR_RESET) $(VERSION)"
+	@echo "$(COLOR_CYAN)$(COLOR_BOLD)Python:$(COLOR_RESET) $(PYTHON_VERSION)"
+	@echo "$(COLOR_CYAN)$(COLOR_BOLD)Git Commit:$(COLOR_RESET) $(GIT_COMMIT)"
+	@echo ""
+
+# Default target
+.DEFAULT_GOAL := help
+
+# ==================================================================================== #
+# FASTAPI DEVELOPMENT COMMANDS
+# ==================================================================================== #
+
+## dev-server: Run FastAPI development server with hot-reload
+.PHONY: dev-server
+dev-server:
+	$(call check_poetry)
+	$(call check_tool,uvicorn)
+	@echo "$(COLOR_BLUE)$(EMOJI_ROCKET) Starting FastAPI development server...$(COLOR_RESET)"
+	@echo "$(COLOR_CYAN)$(EMOJI_INFO) Server running at: http://$(HOST):$(PORT)$(COLOR_RESET)"
+	@echo "$(COLOR_CYAN)$(EMOJI_INFO) API docs at: http://$(HOST):$(PORT)/docs$(COLOR_RESET)"
+	@echo "$(COLOR_CYAN)$(EMOJI_INFO) ReDoc at: http://$(HOST):$(PORT)/redoc$(COLOR_RESET)"
+	@$(POETRY_RUN) uvicorn $(APP_MODULE) --host $(HOST) --port $(PORT) --reload
+
+## dev-debug: Run development server with debugger
+.PHONY: dev-debug
+dev-debug:
+	$(call check_poetry)
+	$(call check_tool,uvicorn)
+	@echo "$(COLOR_BLUE)$(EMOJI_ROCKET) Starting FastAPI server with debugger...$(COLOR_RESET)"
+	@$(POETRY_RUN) uvicorn $(APP_MODULE) --host $(HOST) --port $(PORT) --reload --log-level debug
+
+## dev-ssl: Run development server with SSL
+.PHONY: dev-ssl
+dev-ssl:
+	$(call check_poetry)
+	$(call check_tool,uvicorn)
+	@echo "$(COLOR_BLUE)$(EMOJI_ROCKET) Starting FastAPI server with SSL...$(COLOR_RESET)"
+	@if [ ! -f "cert.pem" ] || [ ! -f "key.pem" ]; then \
+		echo "$(COLOR_YELLOW)$(EMOJI_WARNING) SSL certificates not found. Generating self-signed certificates...$(COLOR_RESET)"; \
+		openssl req -x509 -newkey rsa:4096 -nodes -out cert.pem -keyout key.pem -days 365 -subj "/CN=localhost"; \
+	fi
+	@echo "$(COLOR_CYAN)$(EMOJI_INFO) Server running at: https://$(HOST):$(PORT)$(COLOR_RESET)"
+	@$(POETRY_RUN) uvicorn $(APP_MODULE) --host $(HOST) --port $(PORT) --reload --ssl-keyfile=./key.pem --ssl-certfile=./cert.pem
+
+## shell: Open interactive Python shell with app context
+.PHONY: shell
+shell:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)$(EMOJI_PYTHON) Starting Python shell...$(COLOR_RESET)"
+	@$(POETRY_RUN) python
+
+## routes: Display all API routes
+.PHONY: routes
+routes:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)$(EMOJI_API) API Routes:$(COLOR_RESET)"
+	@$(POETRY_RUN) python -c "from $(firstword $(subst :, ,$(APP_MODULE))) import app; \
+		from fastapi.routing import APIRoute; \
+		routes = [route for route in app.routes if isinstance(route, APIRoute)]; \
+		for route in sorted(routes, key=lambda r: r.path): \
+			methods = ','.join(route.methods); \
+			print(f'{methods:10} {route.path:40} -> {route.name}')"
+
+# ==================================================================================== #
+# API COMMANDS
+# ==================================================================================== #
+
+## openapi-schema: Generate OpenAPI schema JSON
+.PHONY: openapi-schema
+openapi-schema:
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)$(EMOJI_API) Generating OpenAPI schema...$(COLOR_RESET)"
+	@$(POETRY_RUN) python -c "import json; \
+		from $(firstword $(subst :, ,$(APP_MODULE))) import app; \
+		with open('openapi.json', 'w') as f: \
+			json.dump(app.openapi(), f, indent=2)"
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) OpenAPI schema saved to: openapi.json$(COLOR_RESET)"
+
+## openapi-validate: Validate OpenAPI schema
+.PHONY: openapi-validate
+openapi-validate: openapi-schema
+	$(call check_poetry)
+	@echo "$(COLOR_BLUE)$(EMOJI_API) Validating OpenAPI schema...$(COLOR_RESET)"
+	@if $(POETRY_RUN) which openapi-spec-validator > /dev/null 2>&1; then \
+		$(POETRY_RUN) openapi-spec-validator openapi.json; \
+		echo "$(COLOR_GREEN)$(EMOJI_CHECK) OpenAPI schema is valid!$(COLOR_RESET)"; \
+	else \
+		echo "$(COLOR_YELLOW)$(EMOJI_WARNING) openapi-spec-validator not installed$(COLOR_RESET)"; \
+		echo "$(COLOR_YELLOW)Install: poetry add --group dev openapi-spec-validator$(COLOR_RESET)"; \
+	fi
+
+## api-test: Test API endpoints with httpx
+.PHONY: api-test
+api-test:
+	$(call check_poetry)
+	$(call check_tool,pytest)
+	@echo "$(COLOR_BLUE)$(EMOJI_TEST) Testing API endpoints...$(COLOR_RESET)"
+	@$(POETRY_RUN) pytest tests/test_api.py -v
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) API tests complete!$(COLOR_RESET)"
+
+# ==================================================================================== #
+# DATABASE COMMANDS (Alembic)
+# ==================================================================================== #
+
+## db-init: Initialize Alembic migrations
+.PHONY: db-init
+db-init:
+	$(call check_poetry)
+	@if [ ! -d "alembic" ]; then \
+		echo "$(COLOR_BLUE)📊 Initializing Alembic...$(COLOR_RESET)"; \
+		$(POETRY_RUN) alembic init alembic; \
+		echo "$(COLOR_GREEN)$(EMOJI_CHECK) Alembic initialized!$(COLOR_RESET)"; \
+		echo "$(COLOR_CYAN)$(EMOJI_INFO) Configure alembic.ini and alembic/env.py$(COLOR_RESET)"; \
+	else \
+		echo "$(COLOR_YELLOW)$(EMOJI_WARNING) Alembic already initialized$(COLOR_RESET)"; \
+	fi
+
+## db-migrate: Create new migration
+.PHONY: db-migrate
+db-migrate:
+	$(call check_poetry)
+	$(call check_tool,alembic)
+	@echo "$(COLOR_BLUE)📊 Creating new migration...$(COLOR_RESET)"
+	@read -p "Migration message: " message; \
+	$(POETRY_RUN) alembic revision --autogenerate -m "$$message"
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Migration created!$(COLOR_RESET)"
+
+## db-upgrade: Apply migrations (upgrade to head)
+.PHONY: db-upgrade
+db-upgrade:
+	$(call check_poetry)
+	$(call check_tool,alembic)
+	@echo "$(COLOR_BLUE)📊 Applying migrations...$(COLOR_RESET)"
+	@$(POETRY_RUN) alembic upgrade head
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Database upgraded to latest version!$(COLOR_RESET)"
+
+## db-downgrade: Rollback last migration
+.PHONY: db-downgrade
+db-downgrade:
+	$(call check_poetry)
+	$(call check_tool,alembic)
+	@echo "$(COLOR_BLUE)📊 Rolling back last migration...$(COLOR_RESET)"
+	@$(POETRY_RUN) alembic downgrade -1
+	@echo "$(COLOR_GREEN)$(EMOJI_CHECK) Migration rolled back!$(COLOR_RESET)"
+
+## db-history: Show migration history
+.PHONY: db-history
+db-history:
+	$(call check_poetry)
+	$(call check_tool,alembic)
+	@echo "$(COLOR_BLUE)📊 Migration History:$(COLOR_RESET)"
+	@$(POETRY_RUN) alembic history
+
+## db-current: Show current migration version
+.PHONY: db-current
+db-current:
+	$(call check_poetry)
+	$(call check_tool,alembic)
+	@echo "$(COLOR_BLUE)📊 Current Migration:$(COLOR_RESET)"
+	@$(POETRY_RUN) alembic current
+
+## db-reset: Reset database (WARNING: destroys all data)
+.PHONY: db-reset
+db-reset:
+	$(call check_poetry)
+	@echo "$(COLOR_RED)$(EMOJI_WARNING) This will destroy all database data!$(COLOR_RESET)"
+	@read -p "Are you sure? [y/N] " -n 1 -r; \
+	echo; \
+	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
+		echo "$(COLOR_BLUE)📊 Resetting database...$(COLOR_RESET)"; \
+		$(POETRY_RUN) alembic downgrade base; \
+		$(POETRY_RUN) alembic upgrade head; \
+		echo "$(COLOR_GREEN)$(EMOJI_CHECK) Database reset complete!$(COLOR_RESET)"; \
+	else \
+		echo "$(COLOR_YELLOW)Aborted.$(COLOR_RESET)"; \
+	fi
+
+# ==================================================================================== #
+# PRODUCTION COMMANDS
+# ==================================================================================== #
+
+## serve: Run with Uvicorn (production)
+.PHONY: serve
+serve:
+	$(call check_poetry)
+	$(call check_tool,uvicorn)
+	@echo "$(COLOR_BLUE)$(EMOJI_ROCKET) Starting FastAPI production server...$(COLOR_RESET)"
+	@$(POETRY_RUN) uvicorn $(APP_MODULE) --host 0.0.0.0 --port $(PORT) --workers $(WORKERS)
+
+## serve-gunicorn: Run with Gunicorn + Uvicorn workers
+.PHONY: serve-gunicorn
+serve-gunicorn:
+	$(call check_poetry)
+	@if ! $(POETRY_RUN) which gunicorn > /dev/null 2>&1; then \
+		echo "$(COLOR_YELLOW)$(EMOJI_WARNING) gunicorn not installed$(COLOR_RESET)"; \
+		echo "$(COLOR_YELLOW)Install: poetry add gunicorn uvicorn[standard]$(COLOR_RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(COLOR_BLUE)$(EMOJI_ROCKET) Starting Gunicorn with Uvicorn workers...$(COLOR_RESET)"
+	@$(POETRY_RUN) gunicorn $(APP_MODULE) -w $(WORKERS) -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$(PORT)
+
+# ==================================================================================== #
+# COMBINED WORKFLOWS
+# ==================================================================================== #
+
+## quickstart: Install dependencies and start development server
+.PHONY: quickstart
+quickstart: install-dev db-upgrade dev-server
+
+## deploy-check: Run all checks before deployment
+.PHONY: deploy-check
+deploy-check: ci openapi-validate
+	@echo "$(COLOR_GREEN)$(COLOR_BOLD)$(EMOJI_CHECK) Ready for deployment!$(COLOR_RESET)"
